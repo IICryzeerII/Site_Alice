@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Demain soir ?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ffd6e0;
+    --ink: #47102c;
+    --yes: #e8204f;
+    --yes-ink: #fff;
+    --no: #47102c;
+    --no-ink: #ffd6e0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #2a0b1c;
+      --ink: #ffd6e0;
+      --yes: #ff4d78;
+      --yes-ink: #2a0b1c;
+      --no: #ffd6e0;
+      --no-ink: #2a0b1c;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    padding: env(safe-area-inset-top, 0px) 1rem env(safe-area-inset-bottom, 0px);
+  }
+  main { text-align: center; max-width: 34rem; }
+  h1 {
+    font-weight: 800;
+    font-size: clamp(2.4rem, 9vw, 4.6rem);
+    line-height: 1.02;
+    letter-spacing: -0.03em;
+    margin: 0 0 .6rem;
+  }
+  p.sub { font-size: clamp(1rem, 3.5vw, 1.25rem); margin: 0 0 2.2rem; opacity: .8; }
+  .actions { display: flex; gap: 1rem; justify-content: center; align-items: center; min-height: 5rem; }
+  button {
+    font: inherit;
+    font-weight: 800;
+    font-size: 1.15rem;
+    border: 0;
+    border-radius: 999px;
+    padding: .9rem 2rem;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  button:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+  #yes {
+    background: var(--yes);
+    color: var(--yes-ink);
+    transition: transform .25s cubic-bezier(.3,1.6,.5,1);
+    transform: scale(var(--s, 1));
+  }
+  #yes:hover { transform: scale(calc(var(--s, 1) * 1.06)); }
+  #no { background: var(--no); color: var(--no-ink); transition: left .25s ease, top .25s ease; }
+  #no.runaway { position: fixed; z-index: 5; }
+  .hint { min-height: 1.5rem; margin-top: 1.4rem; font-size: .95rem; opacity: .7; }
+
+  #done { display: none; }
+  body.accepted #ask { display: none; }
+  body.accepted #done { display: block; }
+  #done h1 { animation: pop .7s cubic-bezier(.3,1.6,.5,1) both; }
+  @keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  #confetti { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+  @media (prefers-reduced-motion: reduce) {
+    #done h1 { animation: none; }
+    #no, #yes { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main id="ask">
+  <h1>Tu viens dîner avec moi demain soir ?</h1>
+  <p class="sub">Je réserve la table, tu n'as qu'à venir.</p>
+  <div class="actions">
+    <button id="yes" type="button">Oui</button>
+    <button id="no" type="button">Non</button>
+  </div>
+  <div class="hint" id="hint" aria-live="polite"></div>
+</main>
+
+<main id="done" aria-live="polite">
+  <h1>C'est réservé !</h1>
+  <p class="sub">Rendez-vous demain soir. J'ai hâte de te voir.</p>
+</main>
+
+<canvas id="confetti"></canvas>
+
+<script>
+(function () {
+  var yes = document.getElementById('yes');
+  var no = document.getElementById('no');
+  var hint = document.getElementById('hint');
+  var dodges = 0;
+  var scale = 1;
+
+  var messages = [
+    "Hmm, le bouton a glissé.",
+    "Tu es sûre ?",
+    "Il est timide, il se cache.",
+    "Essaie encore, si tu veux.",
+    "Je crois que le bouton Oui t'attend.",
+    "Il est vraiment têtu.",
+    "Le Oui devient plus grand, tu as vu ?"
+  ];
+
+  function moveNo() {
+    var pad = 12;
+    var w = no.offsetWidth, h = no.offsetHeight;
+    var maxX = window.innerWidth - w - pad;
+    var maxY = window.innerHeight - h - pad;
+    var x = pad + Math.random() * Math.max(0, maxX - pad);
+    var y = pad + Math.random() * Math.max(0, maxY - pad);
+
+    if (!no.classList.contains('runaway')) {
+      var r = no.getBoundingClientRect();
+      no.classList.add('runaway');
+      no.style.left = r.left + 'px';
+      no.style.top = r.top + 'px';
+      void no.offsetWidth;
+    }
+    no.style.left = x + 'px';
+    no.style.top = y + 'px';
+
+    dodges++;
+    hint.textContent = messages[Math.min(dodges - 1, messages.length - 1)];
+    scale = Math.min(scale + 0.12, 2.2);
+    yes.style.setProperty('--s', scale);
+  }
+
+  ['mouseenter', 'pointerdown', 'touchstart', 'focus'].forEach(function (evt) {
+    no.addEventListener(evt, function (e) {
+      if (e.cancelable) e.preventDefault();
+      moveNo();
+      if (evt === 'focus') no.blur();
+    }, { passive: false });
+  });
+  no.addEventListener('click', function (e) { e.preventDefault(); moveNo(); });
+  window.addEventListener('resize', function () {
+    if (no.classList.contains('runaway')) moveNo();
+  });
+
+  // Confettis
+  var canvas = document.getElementById('confetti');
+  var ctx = canvas.getContext('2d');
+  var pieces = [];
+  var running = false;
+
+  function resize() {
+    canvas.width = window.innerWidth * devicePixelRatio;
+    canvas.height = window.innerHeight * devicePixelRatio;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function burst() {
+    var colors = ['#e8204f', '#ff7aa2', '#ffd6e0', '#ffb703', '#47102c', '#ffffff'];
+    for (var i = 0; i < 180; i++) {
+      pieces.push({
+        x: window.innerWidth / 2,
+        y: window.innerHeight * 0.45,
+        vx: (Math.random() - 0.5) * 16,
+        vy: Math.random() * -15 - 3,
+        size: 6 + Math.random() * 8,
+        rot: Math.random() * 6,
+        vr: (Math.random() - 0.5) * 0.4,
+        color: colors[(Math.random() * colors.length) | 0],
+        heart: Math.random() < 0.35,
+        life: 0
+      });
+    }
+    if (!running) { running = true; requestAnimationFrame(tick); }
+  }
+
+  function drawHeart(s) {
+    ctx.beginPath();
+    ctx.moveTo(0, s * 0.35);
+    ctx.bezierCurveTo(-s, -s * 0.3, -s * 0.5, -s, 0, -s * 0.4);
+    ctx.bezierCurveTo(s * 0.5, -s, s, -s * 0.3, 0, s * 0.35);
+    ctx.fill();
+  }
+
+  function tick() {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.scale(devicePixelRatio, devicePixelRatio);
+    pieces = pieces.filter(function (p) { return p.y < window.innerHeight + 40 && p.life < 400; });
+    pieces.forEach(function (p) {
+      p.vy += 0.35; p.vx *= 0.99;
+      p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.life++;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+      if (p.heart) drawHeart(p.size); else ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+      ctx.restore();
+    });
+    if (pieces.length) requestAnimationFrame(tick); else running = false;
+  }
+
+  yes.addEventListener('click', function () {
+    document.body.classList.add('accepted');
+    no.style.display = 'none';
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!reduce) { burst(); setTimeout(burst, 500); setTimeout(burst, 1100); }
+  });
+})();
+</script>
+</body>
+</html>
